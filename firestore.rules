@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function hasAnyRole(roles) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isSystemAgent() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'system_agent';
+    }
+    
+    match /issues/{issueId} {
+      allow read: if true; // Issues are public
+      allow create: if true; // Allow public creation for now
+      allow update: if isAuthenticated() && (
+        isOwner(resource.data.reporterId) ||
+        hasAnyRole(['dept_worker', 'dept_head', 'ward_officer', 'municipal_admin']) ||
+        isSystemAgent()
+      );
+      allow delete: if hasRole('municipal_admin');
+    }
+    
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAuthenticated();
+      allow write: if isOwner(userId) || isSystemAgent();
+    }
+    
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+    }
+    
+    match /departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['dept_head', 'ward_officer', 'municipal_admin']);
+    }
+    
+    match /workOrders/{orderId} {
+      allow read: if hasAnyRole(['dept_worker', 'dept_head', 'ward_officer', 'municipal_admin']);
+      allow write: if hasAnyRole(['dept_head', 'ward_officer', 'municipal_admin']) || isSystemAgent();
+    }
+    
+    match /agentAuditLog/{logId} {
+      allow read: if hasAnyRole(['municipal_admin']);
+      allow create: if isSystemAgent();
+      allow update, delete: if false; // Immutable audit log
+    }
+  }
+}

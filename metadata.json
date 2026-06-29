@@ -1,0 +1,12 @@
+{
+  "name": "CivicPulse AI",
+  "description": "Civic infrastructure reporting and resolution platform powered by autonomous AI agents, computer vision, and community validation.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
