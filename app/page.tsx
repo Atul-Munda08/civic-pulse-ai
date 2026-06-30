@@ -10,6 +10,7 @@ import { Search, MapPin, AlertTriangle, ShieldCheck, Share2, CheckCircle2, Circl
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ReportIssueDialog } from '@/components/ReportIssueDialog';
+import { LeaderboardDialog } from '@/components/LeaderboardDialog';
 import { db } from '@/lib/firebase';
 import { collection, query, limit, onSnapshot } from 'firebase/firestore';
 import { motion } from 'motion/react';
@@ -117,7 +118,8 @@ export default function PublicMapPortal() {
           <h1 className="font-bold text-foreground tracking-tight">CivicPulse AI</h1>
           <span className="text-xs text-muted-foreground ml-2 font-medium">Public Portal</span>
         </div>
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex items-center gap-3">
+          <LeaderboardDialog />
           <Link
             href="/login"
             className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "bg-surface/80 backdrop-blur shadow-sm font-semibold")}
