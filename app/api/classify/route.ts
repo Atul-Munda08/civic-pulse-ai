@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     
     const mimeType = file.type || 'image/jpeg';
     
-    const model = 'gemini-3.5-flash';
+    const model = 'gemini-2.5-flash';
 
     const response = await ai.models.generateContent({
       model: model,

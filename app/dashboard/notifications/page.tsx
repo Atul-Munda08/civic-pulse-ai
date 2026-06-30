@@ -82,8 +82,7 @@ export default function NotificationsPage() {
           const notificationsRef = collection(db, 'notifications');
           const notificationsQuery = query(
             notificationsRef,
-            where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('userId', '==', user.uid)
           );
 
           unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
@@ -102,6 +101,12 @@ export default function NotificationsPage() {
                 createdAt: data.createdAt,
               });
             });
+            // Sort client side
+            list.sort((a, b) => {
+              const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+              const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+              return timeB - timeA;
+            });
             setNotifications(list);
             setLoading(false);
           }, (err) => {
@@ -118,8 +123,7 @@ export default function NotificationsPage() {
           const issuesRef = collection(db, 'issues');
           const issuesQuery = query(
             issuesRef,
-            where('reporterId', '==', user.uid),
-            orderBy('reportedAt', 'desc')
+            where('reporterId', '==', user.uid)
           );
 
           unsubscribeIssues = onSnapshot(issuesQuery, (snapshot) => {
@@ -135,6 +139,11 @@ export default function NotificationsPage() {
                 status: data.status || 'AI_CLASSIFIED',
                 reportedAt: data.reportedAt,
               });
+            });
+            list.sort((a, b) => {
+              const timeA = a.reportedAt?.toMillis ? a.reportedAt.toMillis() : 0;
+              const timeB = b.reportedAt?.toMillis ? b.reportedAt.toMillis() : 0;
+              return timeB - timeA;
             });
             setIssues(list);
             setIssuesLoading(false);
