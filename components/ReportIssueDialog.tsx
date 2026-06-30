@@ -94,6 +94,17 @@ export function ReportIssueDialog() {
         reportedAt: serverTimestamp(),
       });
       
+      if (auth.currentUser) {
+        import('firebase/firestore').then(({ doc, increment, setDoc }) => {
+          const userRef = doc(db, 'users', auth.currentUser!.uid);
+          setDoc(userRef, {
+            reportsCount: increment(1),
+            points: increment(10),
+            lastActivity: serverTimestamp(),
+          }, { merge: true });
+        });
+      }
+
       toast.success('Issue reported successfully!');
       setOpen(false);
       setFile(null);

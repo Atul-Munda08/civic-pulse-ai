@@ -1,22 +1,94 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, MapPin, AlertTriangle, ShieldCheck, Share2 } from 'lucide-react';
+import { Search, MapPin, AlertTriangle, ShieldCheck, Share2, CheckCircle2, CircleDashed } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ReportIssueDialog } from '@/components/ReportIssueDialog';
+import { db } from '@/lib/firebase';
+import { collection, query, limit, onSnapshot } from 'firebase/firestore';
+import { motion } from 'motion/react';
 
 const DEFAULT_MAP_CENTER = { lat: 12.9716, lng: 77.5946 };
 
+const STATUS_ORDER = ['REPORTED', 'AI_CLASSIFIED', 'IN_PROGRESS', 'RESOLVED'];
+
+function StatusTracker({ status }: { status: string }) {
+  let currentStepIndex = 0;
+  if (status === 'RESOLVED' || status === 'COMMUNITY_CONFIRMED') {
+    currentStepIndex = 3;
+  } else if (status === 'IN_PROGRESS' || status === 'ASSIGNED') {
+    currentStepIndex = 2;
+  } else if (status === 'AI_CLASSIFIED' || status === 'COMMUNITY_VERIFIED') {
+    currentStepIndex = 1;
+  }
+  
+  return (
+    <div className="w-full mt-4 pt-4 border-t border-border">
+      <div className="flex items-center justify-between relative px-2">
+        <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-muted rounded-full" />
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${(currentStepIndex / (STATUS_ORDER.length - 1)) * 100}%` }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-civic-primary rounded-full origin-left"
+        />
+        {STATUS_ORDER.map((step, idx) => {
+          const isCompleted = idx <= currentStepIndex;
+          const isActive = idx === currentStepIndex;
+          return (
+            <div key={step} className="relative z-10 flex flex-col items-center gap-1 bg-surface px-1">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: idx * 0.15 }}
+                className="bg-surface rounded-full"
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className={`w-5 h-5 ${isActive ? 'text-civic-primary animate-pulse' : 'text-civic-primary'}`} />
+                ) : (
+                  <CircleDashed className="w-5 h-5 text-muted-foreground/40" />
+                )}
+              </motion.div>
+              <span className={`text-[10px] font-bold uppercase ${isCompleted ? 'text-foreground' : 'text-muted-foreground/60'}`}>
+                {step.replace('_', ' ')}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function PublicMapPortal() {
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState(DEFAULT_MAP_CENTER);
   const [searchQuery, setSearchQuery] = useState('');
+  const [issues, setIssues] = useState<any[]>([]);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const q = query(collection(db, 'issues'), limit(50));
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setIssues(list);
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  const selectedIssue = issues.find(i => i.id === selectedIssueId);
 
   const handleSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
@@ -91,36 +163,32 @@ export default function PublicMapPortal() {
           <Card className="shadow-xl border-border bg-surface">
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
-                <Badge variant="outline" className="bg-civic-road/10 text-civic-road border-civic-road/30 font-bold">
-                  LARGE POTHOLE
+                <Badge variant="outline" className="bg-civic-road/10 text-civic-road border-civic-road/30 font-bold uppercase">
+                  {selectedIssue.category || 'OTHER'}
                 </Badge>
-                <button onClick={() => setSelectedIssue(null)} className="text-muted-foreground hover:text-foreground">
+                <button onClick={() => setSelectedIssueId(null)} className="text-muted-foreground hover:text-foreground">
                   ✕
                 </button>
               </div>
-              <CardTitle className="text-xl">MG Road Junction</CardTitle>
+              <CardTitle className="text-xl">{selectedIssue.subCategory || 'Civic Issue'}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="aspect-video bg-muted rounded-md overflow-hidden relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-muted-foreground">Issue Photo</span>
-                </div>
-                {/* AI Detected Polygon Overlay mock */}
-                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
-                  <polygon points="30,40 70,35 75,60 25,65" fill="rgba(226, 75, 74, 0.3)" stroke="#E24B4A" strokeWidth="2" />
-                </svg>
-              </div>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {selectedIssue.aiDescription || 'No description provided.'}
+              </p>
               
               <div className="flex justify-between items-center text-sm">
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <AlertTriangle className="w-4 h-4 text-civic-warning" />
-                  <span>Severity: <strong className="text-foreground">High</strong></span>
+                  <span>Severity: <strong className="text-foreground">{selectedIssue.severity || 'Medium'}</strong></span>
                 </div>
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <ShieldCheck className="w-4 h-4 text-civic-success" />
                   <span>Verified by <strong>12</strong></span>
                 </div>
               </div>
+              
+              <StatusTracker status={selectedIssue.status || 'REPORTED'} />
 
               <div className="flex gap-2 pt-2">
                 <Button className="flex-1 bg-civic-primary hover:bg-civic-primary-dark gap-2">
@@ -155,19 +223,27 @@ export default function PublicMapPortal() {
               disableDefaultUI={true}
               className="w-full h-full"
             >
-              <AdvancedMarker 
-                position={{ lat: 12.9726, lng: 77.5956 }}
-                onClick={() => setSelectedIssue('CIV-0042')}
-              >
-                <Pin background="#D85A30" borderColor="#ffffff" glyphColor="#ffffff" />
-              </AdvancedMarker>
-              
-              <AdvancedMarker 
-                position={{ lat: 12.9700, lng: 77.5920 }}
-                onClick={() => setSelectedIssue('CIV-0056')}
-              >
-                <Pin background="#185FA5" borderColor="#ffffff" glyphColor="#ffffff" />
-              </AdvancedMarker>
+              {issues.map(issue => {
+                if (!issue.geoPoint) return null;
+                const lat = issue.geoPoint.lat;
+                const lng = issue.geoPoint.lng;
+                
+                let color = '#D85A30'; // default coral
+                if (issue.category === 'WATER') color = '#185FA5';
+                else if (issue.category === 'LIGHTING') color = '#BA7517';
+                else if (issue.category === 'WASTE') color = '#3B6D11';
+                else if (issue.category === 'SEWAGE') color = '#533489';
+                
+                return (
+                  <AdvancedMarker 
+                    key={issue.id}
+                    position={{ lat, lng }}
+                    onClick={() => setSelectedIssueId(issue.id)}
+                  >
+                    <Pin background={color} borderColor="#ffffff" glyphColor="#ffffff" />
+                  </AdvancedMarker>
+                );
+              })}
             </Map>
           </APIProvider>
         )}

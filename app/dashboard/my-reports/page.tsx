@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, MapPin, Activity, FileText } from 'lucide-react';
+import { Clock, MapPin, Activity, FileText, CheckCircle2, CircleDashed } from 'lucide-react';
 
 interface IssueItem {
   id: string;
@@ -24,6 +24,62 @@ interface IssueItem {
   status: string;
   reportedAt: any;
   geoPoint?: { lat: number; lng: number };
+}
+
+const STATUS_ORDER = ['REPORTED', 'AI_CLASSIFIED', 'IN_PROGRESS', 'RESOLVED'];
+
+function StatusTracker({ status }: { status: string }) {
+  // Map specific statuses to our 4-step timeline for simplicity
+  let currentStepIndex = 0;
+  if (status === 'RESOLVED' || status === 'COMMUNITY_CONFIRMED') {
+    currentStepIndex = 3;
+  } else if (status === 'IN_PROGRESS' || status === 'ASSIGNED') {
+    currentStepIndex = 2;
+  } else if (status === 'AI_CLASSIFIED' || status === 'COMMUNITY_VERIFIED') {
+    currentStepIndex = 1;
+  }
+  
+  return (
+    <div className="w-full mt-4 pt-4 border-t border-border">
+      <div className="flex items-center justify-between relative px-2">
+        {/* Background line */}
+        <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-muted rounded-full" />
+        
+        {/* Active line */}
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${(currentStepIndex / (STATUS_ORDER.length - 1)) * 100}%` }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-civic-primary rounded-full origin-left"
+        />
+        
+        {STATUS_ORDER.map((step, idx) => {
+          const isCompleted = idx <= currentStepIndex;
+          const isActive = idx === currentStepIndex;
+          
+          return (
+            <div key={step} className="relative z-10 flex flex-col items-center gap-1 bg-surface px-1">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: idx * 0.15 }}
+                className="bg-surface rounded-full"
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className={`w-5 h-5 ${isActive ? 'text-civic-primary animate-pulse' : 'text-civic-primary'}`} />
+                ) : (
+                  <CircleDashed className="w-5 h-5 text-muted-foreground/40" />
+                )}
+              </motion.div>
+              <span className={`text-[10px] font-bold uppercase ${isCompleted ? 'text-foreground' : 'text-muted-foreground/60'}`}>
+                {step.replace('_', ' ')}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function MyReportsPage() {
@@ -148,7 +204,7 @@ export default function MyReportsPage() {
                   key={issue.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface hover:bg-muted/30 transition-colors"
+                  className="p-6 flex flex-col md:flex-row md:flex-wrap md:items-center justify-between gap-4 bg-surface hover:bg-muted/30 transition-colors"
                 >
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2">
@@ -185,6 +241,9 @@ export default function MyReportsPage() {
                      <div className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded">
                        Severity: {issue.severity}/10
                      </div>
+                  </div>
+                  <div className="w-full mt-2 basis-full">
+                    <StatusTracker status={issue.status} />
                   </div>
                 </motion.div>
               ))}

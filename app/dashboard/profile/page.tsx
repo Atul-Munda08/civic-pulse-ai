@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -234,8 +234,32 @@ export default function ProfilePage() {
         // Check and auto-award badges
         await checkAndAutoAward(uid, currentStats, data.badges || []);
       } else {
-        // If profile doesn't exist, use Auth display name as fallback
-        setDisplayName(auth.currentUser?.displayName || 'Citizen Hero');
+        // Create default profile for new citizen
+        const defaultName = auth.currentUser?.displayName || 'Citizen Hero';
+        setDisplayName(defaultName);
+        const defaultStats = {
+          points: 0,
+          reportsCount: 0,
+          verificationsGiven: 0,
+          issuesResolvedCount: 0,
+          streakDays: 0,
+          reputationScore: 100,
+        };
+        setStats(defaultStats);
+        try {
+          await setDoc(userDocRef, {
+            displayName: defaultName,
+            role: 'citizen',
+            homeWardId: 'WARD-47',
+            preferredLanguage: 'en',
+            badges: [],
+            ...defaultStats,
+            createdAt: new Date().toISOString()
+          });
+          await checkAndAutoAward(uid, defaultStats, []);
+        } catch (e) {
+          console.error("Failed to create default profile", e);
+        }
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
